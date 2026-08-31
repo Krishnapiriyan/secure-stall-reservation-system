@@ -26,6 +26,7 @@ public class UserServiceImpl implements UserService {
                 "id", user.getId(),
                 "name", user.getName(),
                 "email", user.getEmail(),
+                "role", user.getRole().name(),
                 "phone", user.getPhone() != null ? user.getPhone() : "",
                 "businessName", user.getBusinessName() != null ? user.getBusinessName() : "");
     }

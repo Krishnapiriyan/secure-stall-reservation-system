@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { authApi } from '../api/client';
+import { OIDC_CONFIG } from '../config';
+import { oidcService } from '../services/oidc';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -11,6 +13,13 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
+
+  const handleOidcLogin = () => {
+    setError('');
+    oidcService.initiateLogin().catch((err) => {
+      setError(err.message || 'Failed to initiate OIDC redirect flow.');
+    });
+  };
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -31,6 +40,27 @@ export default function Login() {
     <div className="container mx-auto px-4 py-12 max-w-md">
       <div className="animate-fadeIn">
         <h1 className="font-display text-2xl font-bold mb-6">Login</h1>
+        
+        {OIDC_CONFIG.enabled && (
+          <div className="mb-6">
+            <button
+              type="button"
+              onClick={handleOidcLogin}
+              className="w-full flex items-center justify-center gap-2 bg-amber-500 hover:bg-amber-600 text-stone-900 font-bold py-3 px-4 rounded-lg shadow-md transition-all duration-200"
+            >
+              <span>🔑</span> Login with Cloud Provider (OIDC)
+            </button>
+            <div className="relative my-6">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-stone-300"></div>
+              </div>
+              <div className="relative flex justify-center text-sm">
+                <span className="bg-white px-2 text-stone-500">Or use local account</span>
+              </div>
+            </div>
+          </div>
+        )}
+
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block font-medium mb-1">Email</label>

@@ -2,6 +2,7 @@ package com.bookfair.Stall_Reservation.dto.reservation;
 
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
+import java.time.LocalDate;
 import java.util.List;
 
 public class CreateBookingRequest {
@@ -27,6 +28,23 @@ public class CreateBookingRequest {
 
     @NotEmpty(message = "Address is required")
     private String address;
+
+    @NotNull(message = "Reservation date is required")
+    private LocalDate reservationDate;
+
+    @NotEmpty(message = "Stall type is required")
+    private String stallType;
+
+    @NotEmpty(message = "Preferred stall size is required")
+    private String preferredStallSize;
+
+    @NotNull(message = "Number of stalls required is required")
+    private Integer stallsRequired;
+
+    @NotEmpty(message = "Business category is required")
+    private String businessCategory;
+
+    private String specialRequirements;
 
     // Getters and Setters
     public Long getEventId() {
@@ -91,5 +109,53 @@ public class CreateBookingRequest {
 
     public void setAddress(String address) {
         this.address = address;
+    }
+
+    public LocalDate getReservationDate() {
+        return reservationDate;
+    }
+
+    public void setReservationDate(LocalDate reservationDate) {
+        this.reservationDate = reservationDate;
+    }
+
+    public String getStallType() {
+        return stallType;
+    }
+
+    public void setStallType(String stallType) {
+        this.stallType = stallType;
+    }
+
+    public String getPreferredStallSize() {
+        return preferredStallSize;
+    }
+
+    public void setPreferredStallSize(String preferredStallSize) {
+        this.preferredStallSize = preferredStallSize;
+    }
+
+    public Integer getStallsRequired() {
+        return stallsRequired;
+    }
+
+    public void setStallsRequired(Integer stallsRequired) {
+        this.stallsRequired = stallsRequired;
+    }
+
+    public String getBusinessCategory() {
+        return businessCategory;
+    }
+
+    public void setBusinessCategory(String businessCategory) {
+        this.businessCategory = businessCategory;
+    }
+
+    public String getSpecialRequirements() {
+        return specialRequirements;
+    }
+
+    public void setSpecialRequirements(String specialRequirements) {
+        this.specialRequirements = specialRequirements;
     }
 }

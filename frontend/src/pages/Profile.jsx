@@ -26,6 +26,13 @@ export default function Profile() {
   return (
     <div className="container mx-auto px-4 py-12 max-w-md">
       <h1 className="font-display text-2xl font-bold mb-6">Profile</h1>
+      
+      <div className="bg-slate-800 p-4 rounded-xl border border-stone-700 text-stone-200 text-sm mb-6 space-y-2">
+        <p><span className="font-semibold text-white">OIDC Username / Subject:</span> {profile.email}</p>
+        <p><span className="font-semibold text-white">Account Role:</span> {profile.role || 'VENDOR'}</p>
+        <p><span className="font-semibold text-white">System ID:</span> {profile.id}</p>
+      </div>
+
       <form onSubmit={handleSubmit} className="space-y-4">
         {['name', 'email', 'phone', 'businessName'].map((key) => (
           <div key={key}>

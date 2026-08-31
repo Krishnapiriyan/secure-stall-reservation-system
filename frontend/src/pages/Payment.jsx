@@ -42,7 +42,16 @@ export default function Payment() {
         eventId: bookingData.eventId,
         stallIds: bookingData.stallIds,
         genreIds: bookingData.genreIds || [],
-        stallDescription: 'Standard Setup',
+        stallDescription: bookingData.stallDescription || 'Standard Setup',
+        
+        // Assignment requirements fields
+        reservationDate: bookingData.reservationDate,
+        stallType: bookingData.stallType,
+        preferredStallSize: bookingData.preferredStallSize,
+        stallsRequired: bookingData.stallsRequired,
+        businessCategory: bookingData.businessCategory,
+        specialRequirements: bookingData.specialRequirements,
+        
         ...formData
       };
 

@@ -5,6 +5,7 @@ import com.bookfair.Stall_Reservation.dto.reservation.CreateBookingRequest;
 import com.bookfair.Stall_Reservation.service.ReservationService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
@@ -47,11 +48,8 @@ public class ReservationController {
     }
 
     @PostMapping("/{id}/approve")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     public ResponseEntity<?> approveReservation(@PathVariable Long id, Authentication auth) {
-        // Logic to check if user is admin (or rely on Security Config, but explicit
-        // check is good)
-        // For now, assuming standard auth. In a real app, use
-        // @PreAuthorize("hasRole('ADMIN')")
         try {
             reservationService.approveReservation(id);
             return ResponseEntity.ok(Map.of("message", "Reservation approved"));
@@ -61,6 +59,7 @@ public class ReservationController {
     }
 
     @PostMapping("/{id}/reject")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     public ResponseEntity<?> rejectReservation(@PathVariable Long id, Authentication auth) {
         try {
             reservationService.rejectReservation(id);
@@ -71,6 +70,7 @@ public class ReservationController {
     }
 
     @PostMapping("/{id}/refund")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     public ResponseEntity<?> refundReservation(@PathVariable Long id, Authentication auth) {
         try {
             reservationService.refundReservation(id);
@@ -81,6 +81,7 @@ public class ReservationController {
     }
 
     @PostMapping("/{id}/reject-refund")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     public ResponseEntity<?> rejectAndRefund(@PathVariable Long id, Authentication auth) {
         try {
             reservationService.rejectAndRefund(id);
@@ -112,6 +113,7 @@ public class ReservationController {
                     r.getStalls().stream().map(rs -> rs.getStall().getStallCode()).collect(Collectors.joining(", ")));
             m.put("genres",
                     r.getGenres().stream().map(rg -> rg.getGenre().getName()).collect(Collectors.joining(", ")));
+            m.put("reservationDate", r.getReservationDate() != null ? r.getReservationDate().toString() : "");
             return m;
         }).collect(Collectors.toList());
         return ResponseEntity.ok(result);
@@ -135,10 +137,19 @@ public class ReservationController {
         Long userId = currentUserId(auth);
         if (userId == null)
             return ResponseEntity.status(401).build();
-        var list = reservationService.getReservationsForVendor(userId);
-        Reservation r = list.stream().filter(res -> res.getId().equals(id)).findFirst().orElse(null);
+
+        boolean isAdmin = auth.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+        Reservation r;
+        if (isAdmin) {
+            r = reservationService.getById(id);
+        } else {
+            var list = reservationService.getReservationsForVendor(userId);
+            r = list.stream().filter(res -> res.getId().equals(id)).findFirst().orElse(null);
+        }
+
         if (r == null)
             return ResponseEntity.notFound().build();
+
         Map<String, Object> m = new HashMap<>();
         m.put("id", r.getId());
         m.put("bookingId", r.getBookingId());
@@ -155,6 +166,16 @@ public class ReservationController {
         m.put("totalAmount", r.getTotalAmount());
         m.put("advanceAmount", r.getAdvanceAmount());
         m.put("qrCodeValue", r.getQrCodeValue() != null ? r.getQrCodeValue() : "");
+
+        // Assignment requirements fields
+        m.put("reservationDate", r.getReservationDate() != null ? r.getReservationDate().toString() : "");
+        m.put("stallType", r.getStallType() != null ? r.getStallType() : "");
+        m.put("preferredStallSize", r.getPreferredStallSize() != null ? r.getPreferredStallSize() : "");
+        m.put("stallsRequired", r.getStallsRequired() != null ? r.getStallsRequired() : 0);
+        m.put("businessCategory", r.getBusinessCategory() != null ? r.getBusinessCategory() : "");
+        m.put("specialRequirements", r.getSpecialRequirements() != null ? r.getSpecialRequirements() : "");
+        m.put("vendorUsername", r.getVendor() != null ? r.getVendor().getEmail() : "");
+
         return ResponseEntity.ok(m);
     }
 

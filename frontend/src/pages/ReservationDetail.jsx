@@ -77,6 +77,17 @@ export default function ReservationDetail() {
         <Detail label="Genres" value={r.genres} />
         <Detail label="Description" value={r.stallDescription || '-'} />
 
+        <div className="pt-4 border-t border-slate-700 space-y-2">
+          <h3 className="font-bold text-blue-400 text-base mb-2">Assignment Specifications</h3>
+          <Detail label="Vendor Username" value={r.vendorUsername || 'N/A'} />
+          <Detail label="Requested Date" value={r.reservationDate || 'N/A'} />
+          <Detail label="Stall Type" value={r.stallType || 'N/A'} />
+          <Detail label="Preferred Size" value={r.preferredStallSize || 'N/A'} />
+          <Detail label="Stalls Required" value={r.stallsRequired || '0'} />
+          <Detail label="Business Category" value={r.businessCategory || 'N/A'} />
+          <Detail label="Special Requests" value={r.specialRequirements || '-'} />
+        </div>
+
         <Detail
           label="Total Amount"
           value={`Rs. ${r.totalAmount}`}

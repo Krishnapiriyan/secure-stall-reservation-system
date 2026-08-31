@@ -47,6 +47,17 @@ export default function AdminUserDetail() {
               </div>
             </div>
 
+            <div className="mt-4 pt-3 border-t border-stone-200 grid grid-cols-2 gap-2 text-stone-600 bg-stone-100/50 p-3 rounded-lg text-xs">
+              <div className="col-span-2 font-bold text-amber-700 text-sm">OIDC Assignment Details:</div>
+              <p><strong>Vendor IDP Username:</strong> {r.vendorUsername || 'N/A'}</p>
+              <p><strong>Requested Date:</strong> {r.reservationDate || 'N/A'}</p>
+              <p><strong>Stall Type:</strong> {r.stallType || 'N/A'}</p>
+              <p><strong>Preferred Size:</strong> {r.preferredStallSize || 'N/A'}</p>
+              <p><strong>Stalls Required:</strong> {r.stallsRequired || '0'}</p>
+              <p><strong>Business Category:</strong> {r.businessCategory || 'N/A'}</p>
+              <p className="col-span-2"><strong>Special Requirements:</strong> {r.specialRequirements || '-'}</p>
+            </div>
+
             <div className="mt-4 flex gap-2 justify-end border-t pt-3">
               {r.status === 'PENDING' && (
                 <>

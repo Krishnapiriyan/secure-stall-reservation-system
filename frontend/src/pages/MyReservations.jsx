@@ -95,6 +95,7 @@ export default function MyReservations() {
                   <div className="flex flex-wrap gap-4 items-end justify-between">
                     <div className="text-sm text-stone-400">
                       <p>Booking ID: {r.bookingId}</p>
+                      <p>Requested Date: {r.reservationDate || 'N/A'}</p>
                       <p>Total: Rs.{r.totalAmount}</p>
                     </div>
 

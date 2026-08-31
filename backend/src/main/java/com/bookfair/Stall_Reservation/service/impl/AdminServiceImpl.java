@@ -139,6 +139,16 @@ public class AdminServiceImpl implements AdminService {
                     map.put("bankName", r.getBankName() != null ? r.getBankName() : "");
                     map.put("address", r.getAddress() != null ? r.getAddress() : "");
                     map.put("totalAmount", r.getTotalAmount());
+
+                    // OIDC Assessment 2 Fields
+                    map.put("reservationDate", r.getReservationDate() != null ? r.getReservationDate().toString() : "");
+                    map.put("stallType", r.getStallType() != null ? r.getStallType() : "");
+                    map.put("preferredStallSize", r.getPreferredStallSize() != null ? r.getPreferredStallSize() : "");
+                    map.put("stallsRequired", r.getStallsRequired() != null ? r.getStallsRequired() : 0);
+                    map.put("businessCategory", r.getBusinessCategory() != null ? r.getBusinessCategory() : "");
+                    map.put("specialRequirements", r.getSpecialRequirements() != null ? r.getSpecialRequirements() : "");
+                    map.put("vendorUsername", r.getVendor() != null ? r.getVendor().getEmail() : "");
+
                     map.put("stallCodes", r.getStalls().stream().map(rs -> rs.getStall().getStallCode())
                             .collect(Collectors.joining(", ")));
                     map.put("genres", r.getGenres().stream().map(rg -> rg.getGenre().getName())

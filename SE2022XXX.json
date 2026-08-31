@@ -1,0 +1,7 @@
+{ 
+  "sid": "SE2022XXX", 
+  "name": "Name with Initials", 
+  "app-url": "https://localhost:5173", 
+  "git": "https://github.com/Krishnapiriyan/secure-stall-reservation-system", 
+  "blog": ["https://medium.com/@yourprofile/securing-web-applications-oidc-federated-auth-owasp-top-10-mitigations-xxxxxx"] 
+}

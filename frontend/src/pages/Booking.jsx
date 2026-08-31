@@ -24,6 +24,14 @@ export default function Booking() {
   const [recommendations, setRecommendations] = useState([]);
   const alertShown = useRef(false);
 
+  // New OIDC Security Assignment Fields
+  const [reservationDate, setReservationDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [stallType, setStallType] = useState('Standard');
+  const [preferredStallSize, setPreferredStallSize] = useState('Small');
+  const [stallsRequired, setStallsRequired] = useState(1);
+  const [businessCategory, setBusinessCategory] = useState('Food & Beverage');
+  const [specialRequirements, setSpecialRequirements] = useState('');
+
   const selectedStalls = useMemo(() => {
     return event?.stalls ? event.stalls.filter(s => selectedStallIds.includes(s.id)) : [];
   }, [event, selectedStallIds]);
@@ -110,6 +118,21 @@ export default function Booking() {
       return;
     }
 
+    const todayStr = new Date().toISOString().split('T')[0];
+    if (!reservationDate) {
+      setError('Reservation date is required.');
+      return;
+    }
+    if (reservationDate < todayStr) {
+      setError('Reservation date must be on or after today.');
+      return;
+    }
+
+    if (!stallsRequired || stallsRequired <= 0) {
+      setError('Number of stalls required must be at least 1.');
+      return;
+    }
+
     const selectedStallNames = stalls
       .filter(s => selectedStallIds.includes(s.id))
       .map(s => `${s.stallCode} (${s.size})`);
@@ -123,7 +146,15 @@ export default function Booking() {
         stallNames: selectedStallNames,
         stallDescription,
         genreIds: selectedGenreIds,
-        totalAmount: total
+        totalAmount: total,
+        
+        // Assignment requirements fields
+        reservationDate,
+        stallType,
+        preferredStallSize,
+        stallsRequired: Number(stallsRequired),
+        businessCategory,
+        specialRequirements
       }
     });
   };
@@ -199,6 +230,93 @@ export default function Booking() {
               </div>
             </div>
           )}
+
+          {/* OIDC Assessment 2 Reservation Details Form */}
+          <section className="bg-slate-800/80 backdrop-blur-md rounded-xl border border-gray-700 p-6 space-y-4">
+            <h2 className="font-semibold text-xl text-blue-300 mb-2 border-b border-gray-700 pb-2 flex items-center gap-2">
+              📋 Stall Vendor Reservation Specifications
+            </h2>
+            <p className="text-gray-400 text-sm">
+              Please specify the required details for this booking request as per Assessment 2 requirements.
+            </p>
+            <div className="grid md:grid-cols-2 gap-4 pt-2">
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1">Reservation Date</label>
+                <input
+                  type="date"
+                  value={reservationDate}
+                  min={new Date().toISOString().split('T')[0]}
+                  onChange={(e) => setReservationDate(e.target.value)}
+                  required
+                  className="w-full bg-gray-900 border border-gray-600 rounded-lg p-2.5 text-white focus:ring-amber-500 focus:border-amber-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1">Number of Stalls Required</label>
+                <input
+                  type="number"
+                  min="1"
+                  value={stallsRequired}
+                  onChange={(e) => setStallsRequired(e.target.value)}
+                  required
+                  className="w-full bg-gray-900 border border-gray-600 rounded-lg p-2.5 text-white focus:ring-amber-500 focus:border-amber-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1">Stall Type</label>
+                <select
+                  value={stallType}
+                  onChange={(e) => setStallType(e.target.value)}
+                  className="w-full bg-gray-900 border border-gray-600 rounded-lg p-2.5 text-white focus:ring-amber-500 focus:border-amber-500"
+                >
+                  <option value="Standard">Standard</option>
+                  <option value="Premium">Premium</option>
+                  <option value="Corner Stall">Corner Stall</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1">Preferred Stall Size</label>
+                <select
+                  value={preferredStallSize}
+                  onChange={(e) => setPreferredStallSize(e.target.value)}
+                  className="w-full bg-gray-900 border border-gray-600 rounded-lg p-2.5 text-white focus:ring-amber-500 focus:border-amber-500"
+                >
+                  <option value="Small">Small</option>
+                  <option value="Medium">Medium</option>
+                  <option value="Large">Large</option>
+                </select>
+              </div>
+
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-300 mb-1">Business Category</label>
+                <select
+                  value={businessCategory}
+                  onChange={(e) => setBusinessCategory(e.target.value)}
+                  className="w-full bg-gray-900 border border-gray-600 rounded-lg p-2.5 text-white focus:ring-amber-500 focus:border-amber-500"
+                >
+                  <option value="Food & Beverage">Food & Beverage</option>
+                  <option value="Clothing">Clothing</option>
+                  <option value="Electronics">Electronics</option>
+                  <option value="Handicrafts">Handicrafts</option>
+                  <option value="Services">Services</option>
+                </select>
+              </div>
+
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-300 mb-1">Special Requirements or Comments</label>
+                <textarea
+                  value={specialRequirements}
+                  onChange={(e) => setSpecialRequirements(e.target.value)}
+                  rows={3}
+                  placeholder="Any special requests or comments (e.g. adjacent stalls, extra power, etc.)"
+                  className="w-full bg-gray-900 border border-gray-600 rounded-lg p-2.5 text-white placeholder-gray-500 focus:ring-amber-500 focus:border-amber-500"
+                />
+              </div>
+            </div>
+          </section>
 
           {/* Stall Description */}
           <div className="space-y-2">

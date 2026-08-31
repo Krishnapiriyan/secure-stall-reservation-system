@@ -3,6 +3,8 @@ import { useAuth } from '../context/AuthContext';
 import { useState, useEffect } from 'react';
 import { adminApi } from '../api/client';
 import logo from '../assets/logo.jpeg';
+import { OIDC_CONFIG } from '../config';
+import { oidcService } from '../services/oidc';
 
 export default function Header() {
   const { user, logout, isAdmin, isVendor } = useAuth();
@@ -14,7 +16,11 @@ export default function Header() {
   const handleLogout = () => {
     logout();
     setDropdown(false);
-    navigate('/');
+    if (OIDC_CONFIG.enabled) {
+      oidcService.initiateLogout();
+    } else {
+      navigate('/');
+    }
   };
 
   useEffect(() => {

@@ -61,6 +61,13 @@ public class ReservationServiceImpl implements ReservationService {
     @Override
     @Transactional
     public Reservation createPendingReservation(CreateBookingRequest request, Long vendorId) {
+        if (request.getReservationDate() == null) {
+            throw new IllegalArgumentException("Reservation date is required.");
+        }
+        if (request.getReservationDate().isBefore(LocalDate.now())) {
+            throw new IllegalArgumentException("Reservation date must be on or after the current date.");
+        }
+
         int maxStalls = appProperties.getBooking().getMaxStallsPerBooking();
         if (request.getStallIds().size() > maxStalls) {
             throw new IllegalArgumentException("Maximum " + maxStalls + " stalls per booking.");
@@ -121,6 +128,14 @@ public class ReservationServiceImpl implements ReservationService {
         reservation.setQrCodeValue(bookingId);
         int cancelDays = appProperties.getCancellation().getAllowedDaysBefore();
         reservation.setCancellationDeadline(eventDate.minusDays(cancelDays));
+
+        // Map new OIDC/Security Assessment fields
+        reservation.setReservationDate(request.getReservationDate());
+        reservation.setStallType(request.getStallType());
+        reservation.setPreferredStallSize(request.getPreferredStallSize());
+        reservation.setStallsRequired(request.getStallsRequired());
+        reservation.setBusinessCategory(request.getBusinessCategory());
+        reservation.setSpecialRequirements(request.getSpecialRequirements());
 
         reservation.setPaymentMethod(PaymentMethod.valueOf(request.getPaymentMethod())); // Enum validation handled by
 
@@ -324,5 +339,10 @@ public class ReservationServiceImpl implements ReservationService {
     public boolean hasActiveReservation(Long vendorId, Long eventId) {
         return reservationRepository.existsByVendorIdAndEventIdAndStatusIn(
                 vendorId, eventId, List.of(ReservationStatus.PENDING, ReservationStatus.SUCCESS));
+    }
+
+    @Override
+    public Reservation getById(Long id) {
+        return reservationRepository.findById(id).orElse(null);
     }
 }
