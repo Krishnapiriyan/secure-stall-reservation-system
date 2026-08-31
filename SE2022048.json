@@ -1,0 +1,7 @@
+{ 
+  "sid": "SE2022048", 
+  "name": "S.Krishnapiriyan", 
+  "app-url": "https://localhost:5173", 
+  "git": "https://github.com/Krishnapiriyan/secure-stall-reservation-system", 
+  "blog": ["https://medium.com/@krishnapiriyan2003/securing-a-web-application-with-oidc-jwt-and-owasp-top-10-mitigations-a8047da4d999"] 
+}

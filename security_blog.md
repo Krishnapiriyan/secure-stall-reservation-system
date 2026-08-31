@@ -1,45 +1,106 @@
-# Securing Web Applications: OIDC Federated Auth & OWASP Top 10 Mitigations
-### A Deep Dive into Building a Secure Stall Reservation Platform
-*Published on Medium*
+# Securing a Web Application with OIDC, JWT and OWASP Top 10 Mitigations
+
+## A Practical Security Enhancement of a Book Fair Stall Reservation System
+
+Building a web application that works correctly is only one part of software engineering. Building one that remains secure when users send malicious requests, manipulate parameters, steal tokens, or attempt to access resources they do not own is a much bigger challenge.
+
+As part of my **Secure Web Application Development** assessment, I took an existing **Book Fair Stall Reservation System** and performed a security-focused enhancement of the application.
+
+The goal was not simply to add authentication.
+
+The goal was to answer a more important question:
+
+> **What happens when a legitimate user behaves maliciously?**
+
+To address this, I introduced and tested multiple security controls, including:
+
+- OpenID Connect (OIDC)
+- OAuth 2.0 Authorization Code Flow with PKCE
+- Auth0-based authentication
+- JWT validation with Spring Security
+- Role-Based Access Control (RBAC)
+- Object-level authorization
+- IDOR protection
+- Input validation
+- SQL injection protection
+- Cross-Site Scripting (XSS) mitigation
+- Restricted CORS
+- WebSocket authentication
+- HTTPS and security headers
+- Secure file uploads
+- Secret management
+- Security logging and monitoring
+
+The application follows a decoupled architecture using **React and Vite** for the frontend, **Spring Boot and Spring Security** for the backend, **MySQL** for persistence, and **Auth0** as the external Identity Provider.
 
 ---
 
-## Introduction
-Security is one of the most important considerations when developing modern web applications. A system may provide all the required functionality, but weak authentication, authorization, input validation, or configuration can expose sensitive information and allow unauthorized operations.
+# 1. Understanding the Application
 
-As part of my Secure Web Application Development assessment, I enhanced an existing Book Fair Stall Reservation System by introducing multiple security mechanisms based on modern authentication standards and OWASP security practices.
+The Book Fair Stall Reservation System allows stall vendors to reserve stalls for book fair events while exhibition organizers manage events, stalls, reservations, and related administrative operations.
 
-The application uses a decoupled architecture with React for the frontend, Spring Boot for the backend, MySQL for data persistence, and Auth0 as the external Identity Provider.
+The main technology stack is:
 
-The main objective was not simply to add a login page, but to ensure that authentication and authorization were enforced securely throughout the application.
+| Layer | Technology |
+|---|---|
+| Frontend | React + Vite |
+| Backend | Spring Boot + Spring Security |
+| Persistence | Spring Data JPA + Hibernate |
+| Database | MySQL |
+| Authentication | Auth0 |
+| Identity Protocol | OpenID Connect |
+| Authorization | OAuth 2.0 + JWT |
+| Real-Time Communication | WebSocket + STOMP |
+| Recommendation Service | FastAPI + Scikit-Learn |
 
----
+The application contains two primary roles:
 
-## Existing Application Architecture
-The application allows stall vendors to reserve stalls for book fair events while exhibition organizers manage events, stalls, and reservations.
-
-The main technology stack consists of:
-* **React and Vite** for the frontend, delivering a responsive Single Page Application (SPA).
-* **Spring Boot and Spring Security** for the backend, hosting RESTful endpoints and managing web security filter chains.
-* **Spring Data JPA and Hibernate** for persistence, mapping database entries to structural entity objects.
-* **MySQL** as the relational database, serving as the central persistent data repository.
-* **Auth0** for authentication, executing federated identity lookups.
-* **OpenID Connect and OAuth 2.0** with JWT access tokens for modern authentication and authorization.
-* **Spring WebSocket/STOMP** for real-time updates on stall availability across clients.
-* **FastAPI and Scikit-Learn** for the recommendation service, analyzing genre historical popularity.
-
-The system contains two main roles:
-* `STALL_VENDOR` — can create reservations and access permitted operations related to their own reservations.
-* `EXHIBITION_ORGANIZER` — can manage events, stalls, reservations, and other administrative functionality.
+- **STALL_VENDOR** – manages their own stall reservations and permitted vendor operations.
+- **EXHIBITION_ORGANIZER** – manages events, stalls, reservations, and administrative operations.
 
 ---
 
-## Moving Authentication to Auth0
-One of the most important security improvements was removing application-managed password authentication. Storing local passwords and custom password-reset mechanisms introduces huge exposure vectors to SQL injection, credential stuffing, and brute force attacks.
+# 2. Authentication vs Authorization
 
-Instead of storing and validating user passwords inside the application database, authentication was delegated to Auth0. The application uses OpenID Connect (OIDC) together with OAuth 2.0 Authorization Code Flow with PKCE.
+One of the biggest lessons from this project was understanding the difference between **authentication** and **authorization**.
 
-The simplified authentication flow is:
+### Authentication
+
+Authentication answers:
+
+> **Who are you?**
+
+### Authorization
+
+Authorization answers:
+
+> **What are you allowed to do?**
+
+For example, a vendor may successfully authenticate and receive a valid JWT. That does not mean the vendor should be able to access an administrative endpoint.
+
+The backend must independently verify whether that user has the required permissions.
+
+This is why security cannot depend on frontend controls such as hiding buttons or removing menu items. An attacker can bypass the frontend completely and send HTTP requests directly to the API.
+
+The backend therefore became the central enforcement point for security decisions.
+
+---
+
+# 3. Replacing Local Password Authentication with Auth0
+
+One of the major security improvements was moving authentication away from application-managed passwords.
+
+Instead of storing and validating user passwords inside the application database, authentication was delegated to **Auth0**.
+
+The application uses:
+
+- OpenID Connect (OIDC)
+- OAuth 2.0
+- Authorization Code Flow
+- PKCE
+
+The resulting flow is:
+
 ```text
 User
   ↓
@@ -51,7 +112,7 @@ User Authentication
   ↓
 Authorization Code
   ↓
-PKCE Code Verification
+PKCE Verification
   ↓
 Access Token
   ↓
@@ -62,249 +123,687 @@ Authorization: Bearer <token>
 Spring Boot API
 ```
 
-### Cryptographic Details of PKCE
-PKCE (Proof Key for Code Exchange) provides additional protection to the authorization-code flow by associating the authorization request with a cryptographically generated code verifier. 
-
-This was particularly appropriate because the React frontend is a public client and cannot safely maintain a traditional client secret:
-1. **Code Verifier**: The React frontend generates a cryptographically secure random string using the browser's `window.crypto.getRandomValues()` API. This string consists of A-Z, a-z, 0-9, and punctuation symbols, with a length of 64 characters.
-2. **Code Challenge**: The verifier is hashed using SHA-256 (`window.crypto.subtle.digest('SHA-256')`). The resulting array buffer is then transformed using a URL-safe Base64 encoding scheme (removing trailing `=`, mapping `+` to `-`, and `/` to `_`).
-3. **Redirection Parameters**: The challenge is sent to Auth0 during redirection as `code_challenge`, along with `code_challenge_method=S256`.
-4. **Token Verification**: When Auth0 returns the code, the React app exchanges it by sending the original `code_verifier`. Auth0 hashes this verifier and confirms it matches the challenge before releasing tokens. This prevents attackers from stealing the authorization code in transit.
+The React application acts as a public client, so it cannot safely keep a traditional client secret. PKCE provides additional protection for the authorization-code exchange.
 
 ---
 
-## JWT Validation in Spring Security
-Receiving a JWT from the frontend does not mean that the backend should automatically trust it.
+# 4. How PKCE Protects the Authentication Flow
 
-The Spring Boot application operates as an OAuth 2.0 Resource Server. For protected API requests, Spring Security validates important properties of the access token, including:
-* **Cryptographic Signature**: Validated dynamically using public keys fetched from the Auth0 JWKS endpoint (`/.well-known/jwks.json`).
-* **Issuer (`iss`)**: Verifying the token was signed by the expected tenant domain.
-* **Audience (`aud`)**: Verifying the token was issued for our backend API identifier.
-* **Expiration (`exp`)**: Ensuring the token is still active and has not expired.
-* **Authorization Claims**: Reading role claims.
+PKCE stands for **Proof Key for Code Exchange**.
 
-The roles supplied through the trusted authentication token are converted into Spring Security authorities such as:
-* `ROLE_STALL_VENDOR`
-* `ROLE_EXHIBITION_ORGANIZER`
+It protects the OAuth 2.0 authorization-code flow by associating the authorization request with a secret value generated by the client.
 
-The backend can then make authorization decisions independently of the frontend. Hiding a button in the frontend is not authorization. Authorization must be enforced by the server.
+### Step 1 — Generate the Code Verifier
 
----
+The React application generates a cryptographically secure random value using the browser's Web Crypto API.
 
-## Preventing Broken Access Control and IDOR
-One of the most important vulnerabilities considered during the enhancement was Broken Access Control (OWASP A01:2021).
+### Step 2 — Generate the Code Challenge
 
-For example, imagine the following endpoint:
-`/api/reservations/25`
+The verifier is hashed using SHA-256 and converted into URL-safe Base64 encoding.
 
-If Vendor A owns reservation 24, simply changing the URL from 24 to 25 must not allow Vendor A to retrieve Vendor B's reservation. This type of problem is commonly associated with Insecure Direct Object Reference (IDOR) or broken object-level authorization.
-
-The application therefore performs ownership checks on the backend. When a Vendor requests a reservation detail, the service fetches the database record, checks `reservation.vendor.id`, and validates if it matches the authenticated user ID:
+Conceptually:
 
 ```text
-   Authenticated User
+code_challenge = BASE64URL(SHA256(code_verifier))
+```
+
+### Step 3 — Send the Challenge
+
+The application sends:
+
+```text
+code_challenge
+code_challenge_method=S256
+```
+
+to Auth0 during authorization.
+
+### Step 4 — Verify the Code
+
+After authentication, Auth0 returns an authorization code.
+
+The application provides the original:
+
+```text
+code_verifier
+```
+
+Auth0 hashes it and verifies that it matches the previously supplied challenge.
+
+Only after successful verification can the token exchange take place.
+
+---
+
+# 5. JWT Validation with Spring Security
+
+Receiving a JWT from the frontend does not mean that the backend should automatically trust it.
+
+The Spring Boot application operates as an **OAuth 2.0 Resource Server** and validates important JWT properties before allowing protected requests.
+
+These include:
+
+### Cryptographic Signature
+
+The token signature is validated using public keys obtained from the Auth0 JWKS endpoint.
+
+### Issuer
+
+The `iss` claim is checked to ensure the token was issued by the expected Identity Provider.
+
+### Audience
+
+The `aud` claim is verified to ensure that the token was issued for the backend API.
+
+### Expiration
+
+The `exp` claim is checked to ensure that expired tokens cannot be used.
+
+### Authorization Claims
+
+Relevant role claims are extracted and mapped to Spring Security authorities.
+
+For example:
+
+```text
+ROLE_STALL_VENDOR
+ROLE_EXHIBITION_ORGANIZER
+```
+
+The backend can then make authorization decisions independently of the frontend.
+
+> **Hiding a button in the frontend is not authorization. Authorization must be enforced by the server.**
+
+---
+
+# 6. OWASP A01 — Broken Access Control and IDOR
+
+One of the most important vulnerabilities addressed was **Broken Access Control (OWASP A01:2021)**.
+
+Consider this API:
+
+```text
+GET /api/reservations/25
+```
+
+Suppose Vendor A owns reservation `24`.
+
+If Vendor A changes the URL to:
+
+```text
+GET /api/reservations/25
+```
+
+the application must not automatically return Vendor B's reservation.
+
+This is an example of **Insecure Direct Object Reference (IDOR)** or broken object-level authorization.
+
+The backend therefore performs an ownership check:
+
+```text
+Authenticated User
         ↓
- Requested Reservation
+Requested Reservation
         ↓
 Check Reservation Owner
         ↓
-      Owner?
-   ↙         ↘
- YES         NO
-  ↓           ↓
-Allow    403 Forbidden
+     Owner?
+     /     \
+   YES      NO
+    ↓        ↓
+  Allow    403
 ```
 
-I tested this protection using different vendor accounts. When one vendor attempted to access another vendor’s reservation, the server returned `403 Forbidden` and blocked access. This demonstrated why authentication and authorization are different concepts:
-* **Authentication** determines who the user is.
-* **Authorization** determines what that authenticated user is allowed to do.
+If the authenticated user does not own the resource:
+
+```text
+HTTP 403 Forbidden
+```
+
+is returned.
+
+I tested this using different vendor accounts. When one vendor attempted to access another vendor's reservation, the request was blocked.
+
+This demonstrated an important principle:
+
+> **A valid login does not automatically grant access to every resource.**
 
 ---
 
-## Preventing Client-Side Identity Manipulation
-Another important design decision was to avoid trusting a vendor ID supplied by the frontend when creating security-sensitive resources.
+# 7. Preventing Client-Side Identity Manipulation
 
-An attacker can manipulate HTTP request bodies even if the normal user interface does not provide that functionality. Instead, the backend obtains the authenticated user’s identity from the validated Spring Security authentication context.
+Another important improvement was removing trust in security-sensitive IDs supplied by the client.
 
-During JIT-provisioning, the database assigns a persistent ID to the vendor record. When the vendor calls the book endpoint, the backend looks up their ID from the principal object bound during validation (`auth.getPrincipal()`) and uses that resolved ID to link the booking record. Changing a vendor ID parameter in a manually crafted request has zero impact on ownership.
+For example, an attacker might modify:
 
----
-
-## Role-Based Access Control
-The system implements server-side Role-Based Access Control (RBAC).
-
-For example, administrative APIs (such as approve, reject, and refund) are restricted to the `EXHIBITION_ORGANIZER` role. Vendor routes are locked down using filter chains.
-
-This means a `STALL_VENDOR` cannot gain organizer functionality simply by manually entering an administrative URL or sending an HTTP request directly to the backend. During security testing, a vendor request to an organizer-only endpoint correctly resulted in a `403 Forbidden` response.
-
----
-
-## Securing User Profile Updates
-Mass assignment is a security concern where a client binds parameters that they should not have rights to modify.
-
-A profile update endpoint should not allow a user to submit fields such as:
 ```json
 {
+  "vendorId": 15,
+  "stallId": 8
+}
+```
+
+to:
+
+```json
+{
+  "vendorId": 1,
+  "stallId": 8
+}
+```
+
+If the backend blindly trusts this value, the attacker may be able to create a reservation under another user's identity.
+
+The solution was to derive the authenticated user's identity from the validated Spring Security authentication context.
+
+The flow becomes:
+
+```text
+JWT
+ ↓
+Spring Security
+ ↓
+Authenticated Principal
+ ↓
+Resolve Local User
+ ↓
+Create Reservation
+```
+
+The backend therefore determines ownership from trusted authentication information rather than client-controlled parameters.
+
+---
+
+# 8. Role-Based Access Control
+
+The application implements server-side **Role-Based Access Control (RBAC)**.
+
+Administrative functionality such as:
+
+- Approving reservations
+- Rejecting reservations
+- Processing refunds
+- Managing users
+
+is restricted to authorized organizer functionality.
+
+For example:
+
+```java
+@PreAuthorize("hasRole('EXHIBITION_ORGANIZER')")
+```
+
+can be used to restrict an endpoint.
+
+A vendor cannot bypass the restriction by manually entering an administrative URL or sending an HTTP request directly to the backend.
+
+During testing, vendor attempts to access organizer-only functionality resulted in:
+
+```text
+HTTP 403 Forbidden
+```
+
+---
+
+# 9. Preventing Mass Assignment
+
+Mass assignment occurs when a client can submit fields that should not be controlled by that client.
+
+For example:
+
+```json
+{
+  "phone": "0712345678",
+  "businessName": "Example Company",
   "role": "EXHIBITION_ORGANIZER",
   "active": true
 }
 ```
-and accidentally cause those security-sensitive properties to be updated.
 
-Profile modification was therefore restricted to specifically permitted fields (such as phone and businessName). Security-sensitive attributes such as the user’s role, OIDC subject identifier, internal ID, and active status cannot be modified through the profile-update operation. This follows the principle of explicitly allowing expected input instead of blindly accepting arbitrary object properties.
+The user should be able to modify legitimate profile information such as:
+
+```text
+phone
+businessName
+```
+
+but not:
+
+```text
+role
+OIDC subject
+internal ID
+active status
+```
+
+Profile updates were therefore restricted to explicitly permitted fields.
+
+This follows a key principle:
+
+> **Allow only what the user is supposed to change.**
 
 ---
 
-## Input Validation
-Input validation was strengthened using Jakarta Bean Validation.
+# 10. Input Validation
 
-Examples of validation annotations used include:
-* `@NotNull`, `@NotBlank`, `@NotEmpty` — enforcing presence of inputs.
-* `@Size`, `@Min`, `@DecimalMin` — restricting string lengths and financial bounds.
-* `@FutureOrPresent` — restricting dates (like the booking reservation date) to today or the future.
+Input validation was strengthened using **Jakarta Bean Validation**.
 
-Controlled values such as payment methods and stall sizes are represented using enums. For example, invalid values such as an unsupported stall size are rejected instead of being processed by the business logic. Validation was applied to reservation and event request DTOs so malformed requests are rejected at the API boundary.
+Examples include:
+
+```java
+@NotNull
+@NotBlank
+@NotEmpty
+@Size
+@Min
+@DecimalMin
+@FutureOrPresent
+```
+
+These validations provide constraints at the API boundary.
+
+For example:
+
+- Required fields cannot be empty.
+- Strings have controlled lengths.
+- Numerical values must satisfy defined limits.
+- Reservation dates cannot be arbitrarily set in the past.
+- Enum-based fields reject unsupported values.
+
+Controlled values such as stall sizes and payment methods are represented using enums instead of accepting arbitrary strings.
 
 ---
 
-## SQL Injection Protection
-SQL injection was also considered during the security review.
+# 11. SQL Injection Protection
 
-The backend uses Spring Data JPA and Hibernate, and repository parameters are bound rather than constructing SQL statements by concatenating untrusted user input. A review of the application did not identify dynamically concatenated native SQL being used for these operations. Using parameterized persistence operations significantly reduces SQL injection risk compared with manually constructing SQL statements from request values.
+SQL injection was considered during the security review.
+
+The backend uses:
+
+- Spring Data JPA
+- Hibernate
+- Repository-based database operations
+
+Rather than constructing SQL queries through unsafe string concatenation, parameters are bound through the persistence layer.
+
+The dangerous pattern is:
+
+```text
+"SELECT * FROM users WHERE name = '" + userInput + "'"
+```
+
+Parameterized persistence operations avoid treating untrusted input as executable SQL syntax.
+
+The application review did not identify dynamically concatenated native SQL being used for these operations.
 
 ---
 
-## Cross-Site Scripting Protection
+# 12. Cross-Site Scripting (XSS)
+
 The React frontend was reviewed for unsafe HTML rendering.
 
-The application does not intentionally use mechanisms such as `dangerouslySetInnerHTML` for rendering untrusted application content. React’s standard rendering behavior escapes text values, helping reduce XSS risk. A Content Security Policy (CSP) is also configured as an additional browser-side security control.
+The application does not intentionally use mechanisms such as:
+
+```javascript
+dangerouslySetInnerHTML
+```
+
+for untrusted application content.
+
+React's standard rendering behavior escapes text values, helping reduce common XSS risks.
+
+A **Content Security Policy (CSP)** is also configured as an additional browser-side security control.
 
 ---
 
-## Restricting CORS
-Cross-Origin Resource Sharing configuration was another important security area.
+# 13. Restricting CORS
 
-A permissive configuration such as allowing every origin (`*`) can unnecessarily expose APIs to cross-origin browser requests. The application therefore uses a restricted CORS allowlist.
+Cross-Origin Resource Sharing was another important security area.
 
-I tested the configuration using a request containing an unauthorized origin:
-`Origin: https://evil-example.com`
+A permissive configuration can unnecessarily expose APIs to cross-origin browser requests.
 
-The server responded with:
-`HTTP/1.1 403 Invalid CORS request`
-and did not grant that origin access.
+The application therefore uses an explicit CORS allowlist instead of allowing arbitrary origins.
 
----
+During testing, I sent a request containing:
 
-## Securing WebSocket Communication
-The application also uses WebSocket/STOMP communication for real-time stall updates. Securing only normal REST endpoints would therefore have been incomplete.
+```text
+Origin: https://evil-example.com
+```
 
-The STOMP connection requires a Bearer access token during the connection process. The backend validates the JWT before associating the connection with an authenticated user. Administrative WebSocket subscriptions are additionally restricted according to the user’s authorization role. This helped me understand that every communication mechanism in an application requires its own security considerations.
+The server rejected the request with:
 
----
+```text
+HTTP/1.1 403 Invalid CORS request
+```
 
-## HTTPS and Security Headers
-The Spring Boot backend was configured to operate over HTTPS during development.
-
-Additional HTTP security controls include headers such as:
-* **HTTP Strict Transport Security (HSTS)**: Forcing browsers to connect using HTTPS.
-* **Content Security Policy (CSP)**: Blocking untrusted external scripts.
-* **Frame Protection (X-Frame-Options: DENY)**: Preventing clickjacking attacks.
-* **X-Content-Type-Options: nosniff**: Preventing MIME-sniffing exploits.
-
-HTTPS protects information transmitted between the frontend and backend from being sent as ordinary plaintext over the network. For production systems, a certificate issued by a trusted Certificate Authority should be used instead of a local development certificate.
+This confirmed that unauthorized browser origins were not accepted.
 
 ---
 
-## Secure File Upload Handling
-Administrative media uploads were another area where untrusted input needed to be considered.
+# 14. Securing WebSocket Communication
 
-The application restricts accepted MIME types and upload sizes. Instead of trusting the filename supplied by the client, the backend generates unique filenames using UUID values and determines permitted extensions on the server. This reduces risks associated with malicious filenames, filename collisions, and unrestricted file types. File upload security could be hardened even further in a production environment using deeper file-content inspection and malware scanning.
+Security cannot stop at REST APIs.
 
----
+The application also uses **WebSocket/STOMP** to provide real-time stall availability updates.
 
-## Protecting Secrets
-One of the easiest security mistakes is committing credentials directly into source code.
+The STOMP connection requires a Bearer access token.
 
-Sensitive configuration such as database passwords, email passwords, OIDC config parameters, and SSL keystore credentials are provided through environment variables. Real `.env` files, private keystores, runtime uploads, and similar sensitive/local files are excluded from version control. Only example configuration values and placeholders are stored in the public repository. This makes it possible for another developer to configure the application without exposing my actual credentials.
+The backend validates the JWT and associates the connection with the authenticated user.
 
----
+Administrative WebSocket subscriptions are also restricted according to authorization roles.
 
-## OWASP Security Audit Report: Before vs. After Fixes
+This reinforced another important principle:
 
-To verify our changes, we ran a security audit before and after the enhancements. The results are summarized below:
-
-### 🔴 Legacy Vulnerabilities (Before Fixes)
-1. **Broken Access Control (A01 - CRITICAL)**: Any Vendor could approve other vendors' bookings:
-   * *Request*: `POST /api/reservations/4/approve` (with Vendor B's token) -> Returned `HTTP 200` `{"message":"Reservation approved"}`.
-2. **Cryptographic Failures (A02 - HIGH)**: Configuration properties contained plain-text secrets like `spring.datasource.password=12345` and mail SMTP passwords.
-3. **Security Misconfiguration (A05 - MEDIUM)**: CORS config allowed wildcard origin matching with credentials allowed:
-   * *Config*: `config.addAllowedOriginPattern("*"); config.setAllowCredentials(true);`
-
-### 🟢 Security Remediations (After Fixes)
-1. **Broken Access Control (A01 - FIXED)**: All admin actions are moved under `/api/admin/reservations/**` and restricted with `@PreAuthorize("hasRole('ADMIN')")`. Accessing this path with a vendor token now results in `HTTP 403 Forbidden`.
-2. **Security Misconfiguration (A05 - FIXED)**: Any Vendor calling administrative paths (e.g., `GET /api/admin/users`) is blocked with a clean `403 Forbidden` response instead of generic errors. CORS is locked down to explicit domain strings.
-3. **Cryptographic Failures (A02 - FIXED)**: All database, JWT, and SMTP credentials are externalized to environment variables.
-4. **Security Logging & Monitoring (A09 - FIXED)**: Added security audit logging:
-   `SECURITY login_success | login_failure | access_denied | invalid_token | reservation_approved`
-5. **Authentication Failures (A07 - OK)**: Token validations are fully operational and unauthorized REST queries return `HTTP 401`.
+> **Every communication channel is part of the application's attack surface.**
 
 ---
 
-## Security Testing
+# 15. HTTPS and Security Headers
+
+The backend was configured to operate over HTTPS during development.
+
+Additional security controls include:
+
+### HSTS
+
+**HTTP Strict Transport Security** instructs browsers to use HTTPS.
+
+### Content Security Policy
+
+CSP restricts which scripts and resources can be executed by the browser.
+
+### X-Frame-Options
+
+```text
+X-Frame-Options: DENY
+```
+
+helps protect against clickjacking.
+
+### X-Content-Type-Options
+
+```text
+X-Content-Type-Options: nosniff
+```
+
+helps prevent MIME-type sniffing.
+
+For production deployment, a certificate issued by a trusted Certificate Authority should be used instead of a local development certificate.
+
+---
+
+# 16. Secure File Uploads
+
+File uploads create another significant attack surface.
+
+An attacker may attempt to upload executable files, unexpected file types, extremely large files, or files with malicious filenames.
+
+The application therefore:
+
+- Restricts accepted MIME types
+- Limits upload sizes
+- Generates unique filenames using UUIDs
+- Determines permitted extensions on the server
+- Avoids trusting the original client filename
+
+For example:
+
+```text
+Original:
+malicious-file.exe
+
+Server-generated:
+550e8400-e29b-41d4-a716-446655440000.jpg
+```
+
+For a production system, this protection could be strengthened further with file-content inspection and malware scanning.
+
+---
+
+# 17. Protecting Secrets
+
+Sensitive credentials should never be committed directly into source control.
+
+The application externalizes sensitive configuration such as:
+
+- Database passwords
+- SMTP passwords
+- OIDC configuration
+- SSL keystore credentials
+
+using environment variables.
+
+Sensitive local files such as:
+
+```text
+.env
+private keystores
+runtime uploads
+```
+
+are excluded from version control.
+
+The public repository contains configuration templates and placeholders rather than actual credentials.
+
+> **Secrets belong in secret-management mechanisms, not source code.**
+
+---
+
+# 18. OWASP Security Audit — Before vs After
+
+To verify the security improvements, the application was reviewed before and after remediation.
+
+## 🔴 Before Security Enhancements
+
+### A01 — Broken Access Control
+
+A vendor could previously attempt an administrative operation such as:
+
+```text
+POST /api/reservations/4/approve
+```
+
+using another vendor's token, and the legacy implementation returned:
+
+```text
+HTTP 200
+{"message":"Reservation approved"}
+```
+
+This demonstrated a serious authorization weakness.
+
+### A02 — Cryptographic Failures
+
+Sensitive configuration contained plaintext credentials, including database and SMTP passwords.
+
+### A05 — Security Misconfiguration
+
+The legacy CORS configuration allowed a wildcard origin pattern together with credentials:
+
+```java
+config.addAllowedOriginPattern("*");
+config.setAllowCredentials(true);
+```
+
+---
+
+## 🟢 After Security Remediation
+
+### A01 — Broken Access Control
+
+Administrative operations were moved behind protected administrative routes and restricted through server-side authorization.
+
+Unauthorized vendor requests now receive:
+
+```text
+HTTP 403 Forbidden
+```
+
+### A05 — Security Misconfiguration
+
+CORS was restricted to explicit trusted origins.
+
+Vendor requests to administrative endpoints are rejected.
+
+### A02 — Cryptographic Failures
+
+Database, JWT, SMTP, and other sensitive configuration values were externalized through environment variables.
+
+### A09 — Security Logging and Monitoring
+
+Security-related events were added to the audit logs:
+
+```text
+login_success
+login_failure
+access_denied
+invalid_token
+reservation_approved
+```
+
+### A07 — Identification and Authentication Failures
+
+Invalid or missing authentication tokens are rejected:
+
+```text
+HTTP 401 Unauthorized
+```
+
+---
+
+# 19. Security Testing
+
 Security controls should not only be implemented; they should also be tested.
 
-Some of the tests I performed included:
-* **No authentication token** → `401 Unauthorized`
-* **Invalid JWT** → `401 Unauthorized`
-* **Vendor accessing organizer endpoint** → `403 Forbidden`
-* **Vendor accessing another vendor's reservation** → `403 Forbidden`
-* **Deactivated user accessing protected functionality** → `403 Forbidden`
-* **Unauthorized CORS origin** → `403 Invalid CORS request`
-* **Invalid event/reservation data** → Request rejected
-* **Valid WebSocket JWT** → Authenticated STOMP connection
+The following tests were performed:
 
-These tests helped verify that the security configuration behaved as expected rather than relying only on source-code inspection.
+| Security Test | Expected Result |
+|---|---|
+| No authentication token | `401 Unauthorized` |
+| Invalid JWT | `401 Unauthorized` |
+| Vendor accessing organizer endpoint | `403 Forbidden` |
+| Vendor accessing another vendor's reservation | `403 Forbidden` |
+| Deactivated user accessing protected functionality | `403 Forbidden` |
+| Unauthorized CORS origin | `403 Invalid CORS request` |
+| Invalid reservation/event data | Request rejected |
+| Valid WebSocket JWT | Authenticated STOMP connection |
 
----
-
-## Challenges Faced
-One of the biggest challenges was integrating an external Identity Provider with an application that already maintained local users.
-
-Auth0 identifies users using an OIDC `sub` claim, while the application still requires local database records for business information and relationships. Therefore, the system needed to map the authenticated OIDC identity to the appropriate local user.
-
-Another challenge involved role synchronization. Authentication roles provided through the validated token needed to correspond correctly with the application’s local role model.
-
-Testing was another interesting challenge. A Spring Boot context test initially attempted to contact a fake OIDC issuer during startup. The test environment was later isolated by mocking the JWT decoder while leaving the production JWT validation configuration unchanged.
-
-WebSocket authentication was also different from normal REST security because the STOMP connection needed authentication during its connection lifecycle.
-
-These challenges showed me that adding authentication is only one part of application security. Identity must be integrated correctly throughout the entire application architecture.
+These tests helped verify that security controls were actually enforced rather than relying only on source-code inspection.
 
 ---
 
-## Key Learning Outcomes
-This project significantly improved my understanding of practical web application security.
+# 20. Challenges I Faced
 
-The most important lessons I learned were:
-1. **Authentication is not authorization.** Knowing who a user is does not automatically mean they should have access to a particular resource.
-2. **Never trust the frontend for security decisions.** Frontend restrictions improve the user experience, but an attacker can construct requests manually.
-3. **Identity should come from trusted authentication data.** Security-sensitive user identity should be derived from a validated token rather than request parameters.
-4. **Authorization must include resource ownership.** RBAC alone is sometimes insufficient. Two users can have the same role while still owning different resources.
-5. **Security should exist across every communication mechanism.** REST APIs, WebSockets, file uploads, database access, and configuration each introduce different security considerations.
-6. **Secrets do not belong in source control.** Environment variables and deployment secret-management mechanisms should be used instead.
-7. **Security requires testing.** A security configuration should be verified using unauthorized, malformed, and adversarial requests.
+Security integration was not straightforward.
+
+The biggest challenge was integrating an external Identity Provider with an application that already maintained local user records.
+
+Auth0 identifies users using the OIDC `sub` claim, while the application still requires local database records for business information and relationships.
+
+Therefore, the system needed to establish a reliable mapping:
+
+```text
+Auth0 Identity
+      ↓
+OIDC Subject
+      ↓
+Local User
+      ↓
+Application Role
+      ↓
+Business Resources
+```
+
+Role synchronization was another challenge because the roles provided by the authentication system needed to correspond correctly with the application's authorization model.
+
+Testing also required additional consideration. A Spring Boot context test initially attempted to communicate with a fake OIDC issuer during startup. The test environment was isolated by mocking the JWT decoder while keeping the production JWT validation configuration unchanged.
+
+WebSocket authentication introduced another challenge because authentication had to be handled during the STOMP connection lifecycle rather than only through normal REST requests.
 
 ---
 
-## Conclusion
-Enhancing the Book Fair Stall Reservation System gave me practical experience applying security concepts beyond theoretical examples.
+# 21. What I Learned
 
-By integrating Auth0, OpenID Connect, OAuth 2.0 with PKCE, JWT validation, Spring Security, RBAC, object-level authorization, input validation, HTTPS, secure WebSockets, restricted CORS, and secure configuration management, the application now has multiple layers of protection.
+This project changed the way I think about web application security.
 
-The most valuable lesson from this assessment was that secure software development is not about implementing one security feature. It requires considering how authentication, authorization, data validation, communication, persistence, configuration, and application logic work together.
+### 1. Authentication is not authorization
+
+Knowing who a user is does not determine what resources they can access.
+
+### 2. Never trust the frontend
+
+A frontend can improve the user experience, but it cannot enforce security by itself.
+
+### 3. Identity should come from trusted authentication data
+
+Security-sensitive identities should be derived from validated authentication information rather than client-supplied parameters.
+
+### 4. RBAC is not always enough
+
+Two users can have the same role but own completely different resources.
+
+That is why role-based authorization often needs to be combined with object-level ownership checks.
+
+### 5. Every communication channel needs security
+
+REST APIs, WebSockets, file uploads, database operations, and configuration all introduce different security risks.
+
+### 6. Secrets should never be committed to source control
+
+Credentials must be externalized and managed securely.
+
+### 7. Security must be tested
+
+A security mechanism is only meaningful if unauthorized and malicious requests are actually rejected.
 
 ---
 
-## Source Code
+# 22. Final Thoughts
+
+Enhancing the Book Fair Stall Reservation System gave me an opportunity to move beyond theoretical security concepts and apply them to a real application.
+
+The project demonstrates that application security is not a single feature that can be added at the end of development.
+
+It is a collection of layers:
+
+```text
+                Secure Application
+                       │
+        ┌──────────────┼──────────────┐
+        ↓              ↓              ↓
+ Authentication   Authorization   Validation
+        │              │              │
+       OIDC            RBAC          DTOs
+       PKCE            IDOR          Constraints
+       JWT             Ownership     Enums
+        │              │              │
+        └──────────────┼──────────────┘
+                       ↓
+             Communication Security
+                       │
+              HTTPS + CORS + CSP
+                       │
+                       ↓
+                Secure Persistence
+                       │
+                  JPA + Hibernate
+                       │
+                       ↓
+                Secure Operations
+                       │
+          Secrets + Logging + Testing
+```
+
+The most important lesson I took from this assessment is simple:
+
+> **Security is not about adding one authentication mechanism. It is about designing every part of the application so that untrusted input, unauthorized users, and unexpected behavior are handled safely.**
+
+By integrating Auth0, OIDC, OAuth 2.0 with PKCE, JWT validation, Spring Security, RBAC, object-level authorization, input validation, restricted CORS, secure WebSockets, HTTPS, security headers, secure file uploads, secret management, and security testing, the application now has multiple layers of protection.
+
+More importantly, I now understand that **secure software development is a continuous engineering process rather than a final checklist before deployment.**
+
+---
+
+# Source Code
+
 The complete project is available in my public GitHub repository:
 👉 **[Secure Stall Reservation System on GitHub](https://github.com/Krishnapiriyan/secure-stall-reservation-system)**
